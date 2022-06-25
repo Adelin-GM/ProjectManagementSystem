@@ -1,0 +1,147 @@
+﻿@page "/tickets/{Id:guid}"
+@inject HttpClient Http
+@attribute [Authorize]
+@inject NavigationManager Navigation
+
+<div class="d-flex justify-content-between">
+    <h3 class="col">Tickets board for project: <b>@Project.Name</b></h3>
+    <p class="col"></p>
+    <div class="col">
+        <button class="btn btn-outline-dark float-right" @onclick="NavigateToReport"><i class="oi oi-plus"></i> Create Report</button>       <!--Create report button-->
+    </div>        
+
+</div>
+
+
+@if (ShowCreate)
+{
+<div class="d-flex justify-content-between text-white" style="background-image: linear-gradient( to right, #b20a2c, #005AA7, #159957 ); ">
+    <div></div>
+    <Create OnCreateCreated="TicketCreated" ProjectId="Project.Id"></Create>
+    <div>
+        <a class="oi oi-x m-1 text-danger" @onclick="ShowCreateTicket"></a>
+    </div>
+</div>
+}
+else
+{
+    <div class="d-flex justify-content-center">
+        <button class="btn btn-outline-dark mr-5" @onclick="ShowCreateTicket"><i class="oi oi-plus"></i> Add a Ticket</button>
+    </div>
+
+}
+<div class="row center m-4">
+    <div class="col text-center">
+        <h5 class="m-4"><b>To do</b></h5>
+        @if (tickets != null)
+        {
+            foreach (var ticket in tickets)
+            {
+                if (ticket.ProjectId == Project.Id)
+                {
+                    if (ticket.State == "Todo")
+                    {
+                        <Read ticket="ticket" OnChanged="GetTickets"></Read>
+                    }
+                }
+            }
+        }
+    </div>
+    <div class="col text-center">
+        <h5 class="m-4"><b>In Progress</b></h5>
+        @if (tickets != null)
+        {
+            foreach (var ticket in tickets)
+            {
+                if (ticket.ProjectId == Project.Id)
+                {
+                    if (ticket.State == "Progress")
+                    {
+                        <Read ticket="ticket" OnChanged="GetTickets"></Read>
+                    }
+                }
+            }
+        }
+    </div>
+    <div class="col text-center">
+        <h5 class="m-4"><b>Done</b></h5>
+        @if (tickets != null)
+        {
+            foreach (var ticket in tickets)
+            {
+                if (ticket.ProjectId == Project.Id)
+                {
+                    if (ticket.State == "Done")
+                    {
+                        <Read ticket="ticket" OnChanged="GetTickets"></Read>
+                    }
+                }
+            }
+        }
+    </div>
+</div>
+
+
+@code {
+    [Parameter]
+    public Guid Id { get; set; }
+
+    private Ticket[] tickets;
+    public Project Project { get; set; } = new Project();
+    bool ShowCreate;
+
+    protected async override Task OnInitializedAsync()
+    {
+        await GetProject();
+        await GetTickets();
+    }
+
+    private void ShowCreateTicket()
+    {
+        if (ShowCreate == false)
+        {
+            ShowCreate = true;
+        }
+        else
+        {
+            ShowCreate = false;
+        }
+    }
+
+    private async Task TicketCreated()
+    {
+        await GetTickets();
+        ShowCreateTicket();
+    }
+
+    private async Task GetTickets()
+    {
+        try
+        {
+            tickets = await Http.GetFromJsonAsync<Ticket[]>("api/Tickets");
+        }
+        catch (Exception)
+        {
+        }
+
+    }
+
+    private async Task GetProject()
+    {
+        try
+        {
+            Project = await Http.GetFromJsonAsync<Project>($"/api/projects/{Id}");
+        }
+        catch (Exception)
+        {
+        }
+
+    }
+
+    private void NavigateToReport()
+    {
+        Navigation.NavigateTo($"/reports/create/{Project.Id}");
+    }
+
+
+}

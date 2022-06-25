@@ -1,0 +1,107 @@
+﻿@page "/projects"
+@inject HttpClient Http
+@attribute [Authorize]
+
+
+<div class="row">
+    @if (Projects != null)
+    {
+        if (userProjects != null)       //if user has any projects
+        {
+            foreach (var userProj in userProjects)
+            {
+                @foreach (var project in Projects)
+                {
+                    if (project.Id == userProj.ProjectId)
+                    {
+                        if (project.CompanyId == Company.Id)
+                        {
+                            <Read Project="project"></Read> <!--Show all projects per company-->
+                        }
+                    }
+                }
+            }
+        }
+    }
+    @if (showCreate)
+    {
+        <div class="col card m-2" style="max-width: 250px; min-width: 250px;">
+            <Create Company="Company" OnCreateCreated="ProjectCreated" OnCancelCreate="ProjectCreated"></Create>
+        </div>
+    }
+    else
+    {
+        <div class="col card m-2" @onclick="ProjectCreated" style="cursor: pointer; max-width: 250px; min-width: 250px;">
+            <p class="text-center"><i class="oi oi-plus"></i><b> Add a project</b></p>                                          <!--Add Project-->
+        </div>
+    }
+
+</div>
+
+<AuthorizeView>
+    <Authorized>
+        @if (true)
+        {
+            currentUser = context.User.Identity.Name;
+        }
+    </Authorized>
+</AuthorizeView>
+
+
+
+
+@code {
+    [Parameter]
+    public Company Company { get; set; }
+    public Project[] Projects;
+    UserProject[] userProjects;
+    private bool showCreate;
+    public string currentUser;
+
+
+
+    protected override async Task OnInitializedAsync()
+    {
+        await GetProjects();
+    }
+
+    private async Task GetProjects()
+    {
+        Projects = await Http.GetFromJsonAsync<Project[]>("api/Projects");
+    }
+
+    private async Task ProjectCreated()
+    {
+        await GetProjects();
+        await GetUsersForProjects();
+        ShowCreate();
+    }
+
+    private void ShowCreate()
+    {
+        if (showCreate)
+        {
+            showCreate = false;
+        }
+        else
+        {
+            showCreate = true;
+        }
+    }
+
+    private async Task GetUsersForProjects()
+    {
+        Console.WriteLine($"Current user is {currentUser}");
+        userProjects = await Http.GetFromJsonAsync<UserProject[]>($"/api/UserProjects/{Company.Id}/{currentUser}");           //get UserProject attributes for specific user
+        //Array.Exists(userProjects, element => element.ProjectId.Equals(UserProject.ProjectId))
+
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        await GetUsersForProjects();
+
+    }
+
+
+}

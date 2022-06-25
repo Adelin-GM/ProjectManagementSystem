@@ -1,0 +1,50 @@
+﻿@page "/tickets/edit"
+
+@inject HttpClient Http
+@inject NavigationManager Navigation
+@attribute [Authorize]
+
+<EditForm Model="ticket" OnValidSubmit="@HandleValidSubmit">
+    <DataAnnotationsValidator /> 
+    <div class="card-header">
+        <h4>@ticket.Name</h4>
+        <input @bind-value="ticket.Name" @bind-value:event="oninput" />
+        <ValidationMessage For="@(() => ticket.Name)" />
+    </div>
+    <div class="card-body">
+        <h5 class="card-title">Description</h5>
+        <input @bind-value="ticket.Description" @bind-value:event="oninput" />
+    </div>
+    <div class="card-footer">
+        <div>
+            <button type="submit" class="btn btn-sm btn-outline-light m-2">Submit</button>
+        </div>
+    </div>
+</EditForm>
+
+
+
+
+@code {
+    [Parameter]
+    public Ticket ticket { get; set; }
+    [Parameter]
+    public EventCallback<Guid> OnEdited { get; set; }
+
+
+    private async void HandleValidSubmit()
+    {
+        try
+        {
+            var response = await Http.PutAsJsonAsync($"/api/Tickets/{ticket.Id}", ticket);
+            response.EnsureSuccessStatusCode();
+
+            await OnEdited.InvokeAsync(ticket.Id);
+        }
+        catch (Exception e)
+        {
+        }
+
+    }
+
+}

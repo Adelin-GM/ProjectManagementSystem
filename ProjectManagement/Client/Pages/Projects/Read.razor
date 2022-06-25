@@ -1,0 +1,139 @@
+﻿@page "/projects/read"
+@inject HttpClient Http
+@inject IJSRuntime JsRuntime
+@attribute [Authorize]
+
+<div class="col card m-2 text-center" style="max-width: 350px; min-width: 350px;">
+    @if (showEdit)
+    {
+        <Edit Id="Project.Id" OnEdited="UpdateEdit"></Edit>
+    }
+    else
+    {
+        <div class="card-header">
+            <a href="/tickets/@Project.Id"><h4>@Project.Name</h4></a>           <!--Project Name-->
+        </div>
+        <div class="card-body">
+            <p><b>Due Date: @Project.DueDate.ToString("dd-MM-yyyy")</b></p>
+            <p><b>Start Date: @Project.StartDate.ToString("dd-MM-yyyy")</b></p>
+        </div>
+        <div class="card-footer">
+            <div class="input-group-prepend">
+                <input @bind-value="inputUser" @bind-value:event="oninput" />
+                <button class="btn btn-sm btn-outline-primary" @onclick="AddUser">Add user</button>            <!--Add user-->
+            </div>
+            <ul class="list-group list-group-flush">
+
+                @if (userProjects != null)
+                {
+                    foreach (var user in userProjects)
+                    {
+                        <li><b>@user.UserName</b></li>
+                    }
+                }
+            </ul>
+        </div>
+    }
+
+    <div class="justify-content-center">
+        <a href="/projects/delete/@Project.Id" class="oi oi-trash text-danger float-right m-2"></a>                     <!--Delete link-->
+        <a style="cursor: pointer" class="oi oi-pencil float-right m-2 text-primary" @onclick="ShowEdit"></a>           <!--Edit link-->
+    </div>
+</div>
+
+
+
+@code {
+    [Parameter]
+    public Project Project { get; set; }
+    bool showEdit = false;
+    ApplicationUser[] users;
+    UserProject[] userProjects;
+    string inputUser = "";
+    public ApplicationUser NewUser { get; set; } = new ApplicationUser();
+    UserProject UserProject { get; set; } = new UserProject();
+
+
+    public void ShowEdit()
+    {
+        if (showEdit == true)
+            showEdit = false;
+        else
+            showEdit = true;
+    }
+
+    public async Task AddUser()
+    {
+        try
+        {
+            NewUser.UserName = inputUser;
+            NewUser = await Http.GetFromJsonAsync<ApplicationUser>($"/api/Values/{NewUser.UserName}");       //returns the user if it exists
+
+        }
+        catch (Exception)
+        {
+            Console.WriteLine("Not Found");
+            await JsRuntime.InvokeVoidAsync("alert", "Not Found!"); //Tell user not found if user does not exist
+            return;
+        }
+
+        try
+        {
+            UserProject.ProjectId = Project.Id;
+            UserProject.ProjectName = Project.Name;
+            UserProject.UserId = NewUser.Id;
+            UserProject.UserName = NewUser.UserName;
+
+            bool hasSameProjId = Array.Exists(userProjects, element => element.ProjectId.Equals(UserProject.ProjectId));
+            bool hasSameUserId = Array.Exists(userProjects, element => element.UserId.Equals(UserProject.UserId));
+            if (hasSameProjId && hasSameUserId)    //return if user is already assigned to this project
+            {
+                Console.WriteLine("User already assigned to this project");
+                return;
+            }
+
+            var response = await Http.PostAsJsonAsync("/api/UserProjects", UserProject);       //Links user to project
+            response.EnsureSuccessStatusCode();
+
+            userProjects = await Http.GetFromJsonAsync<UserProject[]>($"/api/UserProjects/{Project.Id}"); //update userProjectsArray
+
+        }
+        catch (Exception)
+        {
+            Console.WriteLine("Error creating UserProject...");
+        }
+        inputUser = "";
+    }
+
+
+    public async Task UpdateEdit()
+    {
+        Project = await Http.GetFromJsonAsync<Project>($"/api/Projects/{Project.Id}");
+        ShowEdit();
+    }
+
+
+    protected override async Task OnInitializedAsync()
+    {
+        //Console.WriteLine($"Date is: {DateTime.Today.ToString("yyyy-MM-dd")}");
+        //users = await Http.GetFromJsonAsync<User[]>("api/Values");
+        try
+        {
+            users = await Http.GetFromJsonAsync<ApplicationUser[]>("api/Values");
+        }
+        catch (Exception)
+        {
+        }
+
+        try
+        {
+            //userProjects = await Http.GetFromJsonAsync<UserProject[]>("api/UserProjects");
+            userProjects = await Http.GetFromJsonAsync<UserProject[]>($"/api/UserProjects/{Project.Id}");           //get UserProject attributes for specific project using id
+        }
+        catch (Exception)
+        {
+        }
+
+    }
+
+}

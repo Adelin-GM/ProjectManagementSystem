@@ -1,0 +1,102 @@
+﻿@page "/projects/create"
+
+@inject HttpClient Http
+@inject NavigationManager Navigation
+
+<EditForm Model="Project" OnValidSubmit="@HandleValidSubmit">
+    <DataAnnotationsValidator />
+    <div class="form-group m-2">
+        <h4>@Project.Name</h4>
+        <input @bind-value="Project.Name" @bind-value:event="oninput" />
+        <ValidationMessage For="@(() => Project.Name)" />
+    </div>
+    <button type="submit" class="btn btn-sm btn-outline-success m-2">Submit</button>
+    <button type="button" class="btn btn-sm btn-outline-primary m-2" @onclick="CancelCreate">Cancel</button>
+</EditForm>
+
+
+<AuthorizeView>
+    <Authorized>
+        @if (true)
+        {
+            currentUser = context.User.Identity.Name;
+        }
+    </Authorized>
+</AuthorizeView>
+
+@code {
+    [Parameter]
+    public Company Company { get; set; }
+
+    private Project Project { get; set; } = new Project();
+
+    [Parameter]
+    public EventCallback<Guid> OnCreateCreated { get; set; }
+
+    [Parameter]
+    public EventCallback<bool> OnCancelCreate { get; set; }
+
+    public string currentUser;
+    UserProject UserProject { get; set; } = new UserProject();
+    public ApplicationUser Owner { get; set; } = new ApplicationUser();
+
+
+
+    private async void HandleValidSubmit()
+    {
+        try
+        {
+            Project.CompanyId = Company.Id;
+            Project.StartDate = DateTime.Today;
+            Project.DueDate = DateTime.Today;
+            var response = await Http.PostAsJsonAsync("/api/Projects", Project);
+            response.EnsureSuccessStatusCode();
+            var content = await response.Content.ReadAsStringAsync();
+            Project = JsonConvert.DeserializeObject<Project>(content);          //assign all attributes to the project including its Id
+
+            await AddCurrentUserToProject();  //assign the user who created the project to the project
+
+            await OnCreateCreated.InvokeAsync(Project.Id);
+        }
+        catch (Exception e)
+        {
+        }
+
+    }
+
+    private async void CancelCreate()
+    {
+        await OnCancelCreate.InvokeAsync(true);
+    }
+
+    protected override void OnInitialized()
+    {
+        Project.Name = "NewProject";
+    }
+
+
+    private async Task AddCurrentUserToProject()
+    {
+
+        try
+        {
+            Owner = await Http.GetFromJsonAsync<ApplicationUser>($"/api/Values/{currentUser}");       //returns the user if it exists
+            UserProject.ProjectId = Project.Id;
+            UserProject.ProjectName = Project.Name;
+            UserProject.UserId = Owner.Id;
+            UserProject.UserName = Owner.UserName;
+
+            var response = await Http.PostAsJsonAsync("/api/UserProjects", UserProject);       //Links user to project
+            response.EnsureSuccessStatusCode();
+
+        }
+        catch (Exception)
+        {
+            Console.WriteLine("Error creating UserProject...");
+        }
+    }
+
+
+
+}
+

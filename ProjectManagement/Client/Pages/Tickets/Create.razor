@@ -1,0 +1,52 @@
+﻿@page "/tickets/create"
+
+@inject HttpClient Http
+@inject NavigationManager Navigation
+@attribute [Authorize]
+
+<EditForm Model="ticket" OnValidSubmit="@HandleValidSubmit">
+    <DataAnnotationsValidator />
+    <div class="form-group float-left m-2">
+        <label class="control-label m-0">Name</label>
+        <InputText @bind-Value="ticket.Name"></InputText>
+        <ValidationMessage For="@(() => ticket.Name)" />
+    </div>
+
+    <button type="submit" class="btn btn-sm btn-outline-light m-2">Submit</button>
+</EditForm>
+
+
+
+
+@code {
+    [Parameter]
+    public Guid ProjectId { get; set; }
+
+    private Ticket ticket { get; set; } = new Ticket();
+    private string name;
+
+
+    [Parameter]
+    public EventCallback<Guid> OnCreateCreated { get; set; }
+
+
+    private async void HandleValidSubmit()
+    {
+        ticket.State = "Todo";          //state will be at todo when ticket is created
+        ticket.ProjectId = ProjectId;
+        try
+        {
+            var response = await Http.PostAsJsonAsync("/api/Tickets", ticket);
+            response.EnsureSuccessStatusCode();
+
+            await OnCreateCreated.InvokeAsync(ticket.Id);
+        }
+        catch (Exception e)
+        {
+        }
+
+    }
+
+
+
+}

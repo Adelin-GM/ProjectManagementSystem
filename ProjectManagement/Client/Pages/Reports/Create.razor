@@ -1,0 +1,172 @@
+﻿@page "/reports/create/{Id:guid}"
+@inject HttpClient Http
+@attribute [Authorize]
+@inject NavigationManager Navigation
+
+<h3>Report for project <b>@Project.Name</b></h3>
+
+<div class="d-flex justify-content-center m-2">
+    <button class="btn btn-outline-success m-2" @onclick="SaveReport">Save Report</button>
+    <button class="btn btn-outline-dark m-2" @onclick="NavigateToReport">Cancel</button>
+</div>
+
+
+@if (reportList != null)
+{
+    <div>
+        @foreach (var report in reportList)
+        {
+            <p>@report</p>
+        }
+    </div>
+}
+else
+{
+    <p>Loading...</p>
+}
+
+
+@code {
+    [Parameter]
+    public Guid Id { get; set; }
+    public Project Project { get; set; } = new Project();
+    private List<Ticket> tickets;
+    UserTicket[] userTickets;
+    List<string> reportList { get; set; } = new List<string>();
+
+
+
+    protected override async Task OnInitializedAsync()
+    {
+        await GetProject();
+        await GetTickets();
+        await CreateReportList();
+
+    }
+
+    private async Task GetProject()
+    {
+        try
+        {
+            Project = await Http.GetFromJsonAsync<Project>($"/api/projects/{Id}");
+        }
+        catch (Exception)
+        {
+        }
+
+    }
+
+    private async Task GetTickets()
+    {
+        try
+        {
+            tickets = await Http.GetFromJsonAsync<List<Ticket>>("api/Tickets");
+
+        }
+        catch (Exception)
+        {
+        }
+
+    }
+
+    private async Task CreateReportList()
+    {
+        if (tickets != null)
+        {
+            foreach (var ticket in tickets)
+            {
+                if (ticket.ProjectId == Project.Id)
+                {
+                    await UpdateUserTickets(ticket);
+                    foreach (var userTicket in userTickets)
+                    {
+                        if (ticket.State == "Todo")
+                        {
+                            reportList.Add($"{userTicket.UserName} was assigned to ticket {ticket.Name} on {userTicket.AssignedDate.ToString()}, and has not yet started progressing");
+                        }
+                        else if (ticket.State == "Progress")
+                        {
+                            if (userTicket.StartedDate == new DateTime())
+                            {
+                                reportList.Add($"{userTicket.UserName} was assigned to ticket {ticket.Name} on {userTicket.AssignedDate.ToString()}, and is currently in progress with the ticket");
+                            }
+                            else
+                            {
+                                reportList.Add($"{userTicket.UserName} was assigned to ticket {ticket.Name} on" +
+                                $" {userTicket.AssignedDate.ToString()}, and is progressing since {userTicket.StartedDate}");
+                            }
+                        }
+                        else
+                        {
+                            if (userTicket.FinishedDate == new DateTime())
+                            {
+                                reportList.Add($"{userTicket.UserName} was assigned to ticket {ticket.Name} on {userTicket.AssignedDate.ToString()}, and is currently in finished with the ticket");
+                            }
+                            else if (userTicket.StartedDate == new DateTime() && userTicket.FinishedDate != new DateTime())
+                            {
+                                reportList.Add($"{userTicket.UserName} was assigned to ticket {ticket.Name} on {userTicket.AssignedDate.ToString()}, and finished with the ticket on {userTicket.FinishedDate}");
+                            }
+                            else
+                            {
+                                reportList.Add($"{userTicket.UserName} was assigned to ticket {ticket.Name} on" +
+                                $" {userTicket.AssignedDate.ToString()}, started progressing on {userTicket.StartedDate}, and finished on {userTicket.FinishedDate}");
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    public async Task UpdateUserTickets(Ticket ticket)
+    {
+        try
+        {
+            userTickets = await Http.GetFromJsonAsync<UserTicket[]>($"/api/UserTicket/{ticket.Id}");
+        }
+        catch (Exception)
+        {
+        }
+    }
+
+    private void NavigateToReport()
+    {
+        Navigation.NavigateTo($"/tickets/{Project.Id}");
+    }
+
+    private async void SaveReport()
+    {
+        Report report = new Report();
+        report.Name =  $"{Project.Name} report";
+        report.ProjectId = Project.Id;
+        report.ReportDate = DateTime.Now;
+        try
+        {
+            var response = await Http.PostAsJsonAsync("/api/Reports", report);
+            response.EnsureSuccessStatusCode();
+            var content = await response.Content.ReadAsStringAsync();
+            var Report = JsonConvert.DeserializeObject<Report>(content);
+
+            foreach (var item in reportList)
+            {
+                Line line = new Line();
+                line.Name = item;
+                line.ReportId = Report.Id;
+                var newResponse = await Http.PostAsJsonAsync("/api/Lines", line);
+                newResponse.EnsureSuccessStatusCode();
+
+            }
+            Navigation.NavigateTo($"/reports");
+
+        }
+        catch (Exception)
+        {
+
+            throw;
+        }
+
+
+    }
+
+
+}

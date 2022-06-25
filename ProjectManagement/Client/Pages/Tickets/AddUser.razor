@@ -1,0 +1,106 @@
+﻿@page "/tickets/AddUser"
+
+@inject HttpClient Http
+@inject NavigationManager Navigation
+@inject IJSRuntime JsRuntime
+@attribute [Authorize]
+
+<EditForm Model="ticket" OnValidSubmit="@HandleValidSubmit">
+    <DataAnnotationsValidator />
+    <div class="card-header">
+        <h4>@ticket.Name</h4>
+    </div>
+    <div class="card-body">
+        <h5 class="card-title">Add User</h5>
+        <input @bind-value="inputUser" @bind-value:event="oninput" />
+    </div>
+    <div class="card-footer">
+        <div>
+            <button type="submit" class="btn btn-sm btn-outline-light m-2">Add</button>
+            <button type="button" @onclick="cancelButtonAction" class="btn btn-sm btn-outline-light m-2">Cancel</button>
+        </div>
+    </div>
+</EditForm>
+
+
+
+
+@code {
+    [Parameter]
+    public Ticket ticket { get; set; }
+    [Parameter]
+    public EventCallback<Guid> OnEdited { get; set; }
+    string inputUser = "";
+    public ApplicationUser NewUser { get; set; } = new ApplicationUser();
+    UserTicket UserTicket { get; set; } = new UserTicket();
+    UserTicket[] userTickets;
+
+
+    private async void HandleValidSubmit()
+    {
+        try
+        {
+            NewUser.UserName = inputUser;
+            NewUser = await Http.GetFromJsonAsync<ApplicationUser>($"/api/Values/{NewUser.UserName}");       //returns the user if it exists
+
+        }
+        catch (Exception)
+        {
+            Console.WriteLine("Not Found");
+            await JsRuntime.InvokeVoidAsync("alert", "Not Found!");         //Tell user not found if user does not exist
+            return;
+        }
+
+        try
+        {   
+            UserTicket.AssignedDate = DateTime.Now;
+            UserTicket.TicketId = ticket.Id;
+            UserTicket.TicketName = ticket.Name;
+            UserTicket.UserId = NewUser.Id;
+            UserTicket.UserName = NewUser.UserName;
+
+            bool hasSameTicketId = Array.Exists(userTickets, element => element.TicketId.Equals(UserTicket.TicketId));
+            bool hasSameUserId = Array.Exists(userTickets, element => element.UserId.Equals(UserTicket.UserId));
+            if (hasSameTicketId && hasSameUserId)                           //return if user is already assigned to this ticket
+            {
+                Console.WriteLine("User already assigned to this ticket");
+                await JsRuntime.InvokeVoidAsync("alert", "User already assigned to this ticket");
+                return;
+            }
+
+
+            var response = await Http.PostAsJsonAsync("/api/UserTicket", UserTicket);                     //Links user to ticket
+            response.EnsureSuccessStatusCode();
+
+            //userTickets = await Http.GetFromJsonAsync<UserTicket[]>($"/api/UsersTicket/{ticket.Id}");       //update userTicketsArray
+
+            await OnEdited.InvokeAsync(ticket.Id);
+
+        }
+        catch (Exception)
+        {
+            Console.WriteLine("Error creating UserTicket...");
+        }
+    }
+
+    private async void cancelButtonAction()
+    {
+        await OnEdited.InvokeAsync(ticket.Id);
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            //await Http.GetFromJsonAsync<string>($"/api/UserTicket");
+            userTickets = await Http.GetFromJsonAsync<UserTicket[]>($"/api/UserTicket/{ticket.Id}");           //get UserProject attributes for specific project using id
+
+        }
+        catch (Exception e)
+        {
+            Console.WriteLine($"Not working {e}");
+        }
+
+    }
+
+}

@@ -1,0 +1,81 @@
+﻿@page "/reports"
+@inject HttpClient Http
+@inject IJSRuntime JsRuntime
+@attribute [Authorize]
+
+<h3>Reports Page</h3>
+
+
+@if (Reports != null)
+{
+    foreach (var report in Reports)
+    {
+        <div class="m-2 bg-dark text-white">
+            <p @onclick="() => DeleteReport(report)" class="oi oi-trash text-danger float-right m-2"></p>                    <!--Delete link-->
+            <h4 class="m-2">@report.Name  @report.ReportDate.ToString()</h4>
+            @foreach (var line in report.reportLines)
+            {
+                <p>@line.Name</p>
+            }
+        </div>
+    }
+}
+
+
+
+
+@code {
+    public Report[] Reports;
+    List<List<string>> reportsList { get; set; } = new List<List<string>>();
+    int count;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await GetReports();
+        await GetList();
+    }
+
+    private int incrementCount()
+    {
+        count++;
+        return count;
+    }
+
+    private async Task GetReports()
+    {
+        try
+        {
+            Reports = await Http.GetFromJsonAsync<Report[]>("api/Reports");
+        }
+        catch (Exception)
+        {
+        }
+    }
+
+    private async Task GetList()
+    {
+        if (Reports != null)
+        {
+            foreach (var report in Reports)
+            {
+                Line[] lines = await Http.GetFromJsonAsync<Line[]>($"/api/Lines/{report.Id}");
+                report.reportLines = lines;
+
+            }
+        }
+    }
+
+    private async Task DeleteReport(Report report)
+    {
+        bool confirmed = await JsRuntime.InvokeAsync<bool>("confirm", $"Are you sure you want to delete report {report.Name}?");
+        if (!confirmed)
+            return;
+        await Http.DeleteAsync($"/api/Reports/{report.Id}");
+        await GetReports();
+        await GetList();
+
+
+    }
+
+
+}

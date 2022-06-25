@@ -1,0 +1,261 @@
+﻿@page "/tickets/read"
+
+@inject HttpClient Http
+@inject IJSRuntime JsRuntime
+@attribute [Authorize]
+
+
+
+
+<div class="card text-white mb-3 col-md-8 offset-md-2" style="max-width: 25rem; max-width: 25rem; background-image: linear-gradient( to right, @cardBackground );">
+    @if (showEdit)
+    {
+        <Edit ticket="ticket" OnEdited="UpdateEdit"></Edit>
+    }
+    else if (showAddUser)
+    {
+        <AddUser OnEdited="UpdateEdit" ticket="ticket"></AddUser>
+    }
+    else if (showDetails)
+    { 
+        <ReadUsers OnEdited="UpdateEdit" userTickets="userTickets" ticket="ticket"></ReadUsers>
+    }
+    else
+    {
+        <div class="card-header d-flex justify-content-between">
+            <div class="p-2">
+                @if (ticket.State != "Todo")
+                {
+                    <a style="cursor: pointer" class="oi oi-caret-left float-right m-2 text-light" @onclick="ChangeToLeftState"></a> <!--Change to the state on the left-->
+                }
+            </div>
+
+            <h4>@ticket.Name</h4>
+            <div class="p-2">
+                @if (ticket.State != "Done")
+                {
+                    <a style="cursor: pointer" class="oi oi-caret-right float-right m-2 text-light" @onclick="ChangeToRightState"></a> <!--Change to the state on the right-->
+                }
+            </div>
+
+        </div>
+        <div class="card-body">
+            <h5 class="card-title">Description</h5>
+            <p class="card-text">@ticket.Description</p>
+        </div>
+        <div class="card-footer">
+            <div class="d-flex justify-content-between">
+                <div class="p-2">
+                </div>
+                <div class="p-2">
+                </div>
+                <div class="p-2">
+                    <a style="cursor: pointer" class="oi oi-trash float-right m-2 text-danger" @onclick="DeleteTicket"></a>             <!--Delete link-->
+                    <a style="cursor: pointer" class="oi oi-pencil float-right m-2 text-primary" @onclick="ShowEdit"></a>               <!--Edit link-->
+                    <a style="cursor: pointer" class="oi oi-info float-right m-2 text-light" @onclick="ShowDetails"></a>                <!--Show details-->
+                    <a style="cursor: pointer" class="oi oi-plus float-right m-2 text-success" @onclick="ShowAddUsers"></a>             <!--Show Add Users-->
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+
+
+
+
+@code {
+    [Parameter]
+    public Ticket ticket { get; set; }
+    [Parameter]
+    public string cardBackground { get; set; }
+    bool showEdit;
+    bool showDetails;
+    bool showAddUser;
+    UserTicket[] userTickets;
+
+    [Parameter]
+    public EventCallback<Guid> OnChanged { get; set; }
+
+
+    protected override async void OnInitialized()
+    {
+        SetCardBackground();
+        await UpdateUserTickets();
+
+    }
+
+    public async Task UpdateUserTickets()
+    {
+        try
+        {
+            userTickets = await Http.GetFromJsonAsync<UserTicket[]>($"/api/UserTicket/{ticket.Id}");
+        }
+        catch (Exception)
+        {
+        }
+    }
+
+    private void SetCardBackground()
+    {
+        if (ticket.State == "Done")
+            cardBackground = "#000, #159957";                     //green
+        else if (ticket.State == "Progress")
+            cardBackground = "#000, #005AA7";                     //blue
+        else
+            cardBackground = "#000, #b20a2c";                     //black
+    }
+
+    public void ShowEdit()
+    {
+        if (showEdit == true)
+        {
+            showEdit = false;
+        }
+        else
+        {
+            showDetails = false;
+            showAddUser = false;
+            showEdit = true;
+        }
+    }
+
+    private void ShowDetails()
+    {
+        if (showDetails == true)
+        {
+            showDetails = false;
+        }
+        else
+        {
+            showEdit = false;
+            showAddUser = false;
+            showDetails = true;
+        }
+    }
+
+    private void ShowAddUsers()
+    {
+        if (showAddUser == true)
+        {
+            showAddUser = false;
+        }
+        else
+        {
+            showDetails = false;
+            showEdit = false;
+            showAddUser = true;
+        }
+    }
+
+
+
+
+
+    public async Task UpdateEdit()
+    {
+        await UpdateUserTickets();
+        ticket = await Http.GetFromJsonAsync<Ticket>($"/api/Tickets/{ticket.Id}");
+        showDetails = false;
+        showAddUser = false;
+        showEdit = false;
+    }
+
+    private async void DeleteTicket()
+    {
+        bool confirmed = await JsRuntime.InvokeAsync<bool>("confirm", $"Are you sure you want to delete {ticket.Name}?");
+        if (!confirmed)
+            return;
+
+
+        await Http.DeleteAsync($"/api/Tickets/{ticket.Id}");
+        await OnChanged.InvokeAsync(ticket.Id);
+    }
+
+
+
+
+    private async void ChangeToRightState()
+    {
+        foreach (var userTicket in userTickets)         //log user progress
+        {
+            if (ticket.State == "Todo")
+            {
+                userTicket.StartedDate = DateTime.Now;
+                await UpdateUserTicketInDatabase(userTicket);
+            }
+            else if (ticket.State == "Progress")
+            {
+                userTicket.FinishedDate = DateTime.Now;
+                await UpdateUserTicketInDatabase(userTicket);
+            }
+        }
+
+        if (ticket.State == "Todo")
+        {
+            ticket.State = "Progress";
+        }
+        else if(ticket.State == "Progress")
+        {
+            ticket.State = "Done";
+        }
+        await UpdateTicket();
+
+    }
+
+    private async void ChangeToLeftState()
+    {
+        foreach (var userTicket in userTickets)         //change user progress logs
+        {
+            if (ticket.State == "Done")
+            {
+                userTicket.FinishedDate = new DateTime();   //in the ticket is moved back the finish date will be removed
+                await UpdateUserTicketInDatabase(userTicket);
+            }
+            else if (ticket.State == "Progress")
+            {
+                userTicket.StartedDate = new DateTime();   //in the ticket is moved back the started date will be removed
+                await UpdateUserTicketInDatabase(userTicket);
+            }
+        }
+
+        if (ticket.State == "Done")
+        {
+            ticket.State = "Progress";
+        }
+        else if (ticket.State == "Progress")
+        {
+            ticket.State = "Todo";
+        }
+        await UpdateTicket();
+    }
+
+    private async Task UpdateTicket()
+    {
+        try
+        {
+            var response = await Http.PutAsJsonAsync($"/api/Tickets/{ticket.Id}", ticket);
+            response.EnsureSuccessStatusCode();
+
+            await OnChanged.InvokeAsync(ticket.Id);
+        }
+        catch (Exception e)
+        {
+        }
+    }
+
+    private async Task UpdateUserTicketInDatabase(UserTicket ut)
+    {
+        try
+        {
+            var response = await Http.PutAsJsonAsync($"/api/UserTicket/{ut.Id}", ut);
+            response.EnsureSuccessStatusCode();
+        }
+        catch (Exception e)
+        {
+        }
+    }
+
+
+
+}

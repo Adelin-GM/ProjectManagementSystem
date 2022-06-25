@@ -1,0 +1,76 @@
+﻿@page "/companies"
+@inject HttpClient Http
+@attribute [Authorize]
+
+<h3>List of Companies</h3>
+
+
+@if (ShowCreate)
+{
+    <div class="d-flex justify-content-between text-white" style="background-image: linear-gradient( 45deg, #3a0647, #052767);">
+        <div></div>
+        <Create OnCreateCreated="CompanyCreated"></Create>
+        <div>
+            <a class="oi oi-x m-1 text-danger" @onclick="CompanyCreated"></a>       <!--Close button to hide create field-->
+        </div>
+    </div>
+}
+else
+{
+    <div class="d-flex justify-content-center">
+        <button class="btn btn-outline-dark mr-5" @onclick="CompanyCreated"><i class="oi oi-plus"></i> Add a company</button>
+    </div>
+
+}
+
+
+@if (companies == null)
+{
+    <p>Loading...</p>
+}
+else
+{
+    <div>
+        @foreach (var company in companies)
+        {
+            <Read Company="company"></Read>
+        }
+    </div>
+}
+
+@code {
+    private Company[] companies;
+    private bool ShowCreate;
+
+    private void ShowCreateCompany()
+    {
+        if (ShowCreate == false)
+        {
+            ShowCreate = true;
+        }
+        else
+        {
+            ShowCreate = false;
+        }
+    }
+
+    private async Task CompanyCreated()
+    {
+        await GetCompany();
+        ShowCreateCompany();
+    }
+
+    private async Task GetCompany()
+    {
+        companies = await Http.GetFromJsonAsync<Company[]>("api/Companies");
+    }
+
+
+    protected override async Task OnInitializedAsync()
+    {
+        await GetCompany();
+    }
+
+
+}
+

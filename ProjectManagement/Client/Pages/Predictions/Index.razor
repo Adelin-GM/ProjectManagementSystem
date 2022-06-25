@@ -1,0 +1,146 @@
+﻿@page "/predictions"
+
+@inject HttpClient Http
+@inject NavigationManager Navigation
+@inject IJSRuntime JsRuntime
+@attribute [Authorize]
+
+<h3>Make a prediction</h3>
+
+
+<div class="form-group">
+    <select @bind="SelectedCompany.Id">
+        <option>Select a company</option>
+        @if (companies != null)
+        {
+            @foreach (var comp in companies)
+            {
+                <option value="@comp.Id">@comp.Name</option>
+            }
+        }
+    </select>
+</div>
+
+<label for="date">Select a year and a month:</label>
+<input type="date" id="date" name="start" min="@today" @bind-value="SelectedDate" @onclick="ClearProjectHistoryList">
+<p>Prediction for @SelectedDate.ToString("MMM-yyyy")</p>
+<button class="btn btn-sm btn-outline-dark" @onclick="MakePrediction">Make Prediction</button>
+
+
+@if (ProjectHistory != null && ProjectHistory.Count != 0)
+{
+    <p class="m-4">For date <b>@SelectedDate.ToString("MMM-yyyy")</b>, the predicted number of projects is <b>@ProjectHistory.Count</b>, and the predicted number of people needed per project is <b>@averageUsers</b>.</p>
+}
+
+
+
+
+
+
+
+@code {
+    string today = DateTime.Today.ToString("yyyy-MM-dd");
+    public DateTime SelectedDate { get; set; } = DateTime.Today;
+    public Company SelectedCompany { get; set; } = new Company();
+    Company[] companies;
+    Project[] projects;
+    List<Project> ProjectHistory { get; set; } = new List<Project>();
+    int userCount;
+    int averageUsers;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await GetCompanies();
+    }
+
+    private async Task GetCompanies()
+    {
+        companies = await Http.GetFromJsonAsync<Company[]>("api/Companies");
+    }
+
+    private async Task GetProjects()
+    {
+        try
+        {
+            projects = await Http.GetFromJsonAsync<Project[]>($"/api/projects/company/{SelectedCompany.Id}");
+        }
+        catch (Exception e)
+        {
+        }
+    }
+
+    private void SelectProjectsWhichIncludeSelectedMonth()
+    {
+        ProjectHistory = new List<Project>();
+        if (projects != null)
+        {
+            foreach (var project in projects)
+            {
+                if (project.StartDate.Year == project.DueDate.Year)
+                {
+                    if (SelectedDate.Month >= project.StartDate.Month && SelectedDate.Month <= project.DueDate.Month)
+                    {
+                        ProjectHistory.Add(project);
+                    }
+                }
+                else
+                {
+                    if (SelectedDate.Month >= project.StartDate.Month)
+                    {
+                        ProjectHistory.Add(project);
+                    }
+                    else if (SelectedDate.Month <= project.DueDate.Month)
+                    {
+                        ProjectHistory.Add(project);
+                    }
+                }
+            }
+        }
+    }
+
+    private async Task getAverageUsers()
+    {
+        if (ProjectHistory.Any())
+        {
+            foreach (var project in ProjectHistory)
+            {
+
+                List<UserProject> userProjects = await Http.GetFromJsonAsync<List<UserProject>>($"/api/UserProjects/{project.Id}");
+                userCount += userProjects.Count;
+
+            }
+        }
+        else
+        {
+            await JsRuntime.InvokeVoidAsync("alert", "Not enought data to make a prediction for selected month"); // Alert
+            ClearProjectHistoryList();
+            return;
+        }
+        averageUsers = userCount / ProjectHistory.Count;
+    }
+
+
+
+
+
+    private async Task MakePrediction()
+    {
+        await GetProjects();
+        userCount = 0;
+        if (projects.Length == 0)
+        {
+            await JsRuntime.InvokeVoidAsync("alert", "An error occurred, no project history found for this company"); // Alert
+            return;
+        }
+        SelectProjectsWhichIncludeSelectedMonth();
+        await getAverageUsers();
+
+    }
+
+
+    private void ClearProjectHistoryList()
+    {
+        ProjectHistory = new List<Project>();
+    }
+
+}

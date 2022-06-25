@@ -1,0 +1,47 @@
+﻿@page "/tickets/ReadUsers"
+
+@inject HttpClient Http
+@inject NavigationManager Navigation
+@inject IJSRuntime JsRuntime
+@attribute [Authorize]
+
+
+<div class="card-header">
+    <h4>@ticket.Name</h4>
+</div>
+<div class="card-body">
+    <h5 class="card-title">List of Assigned users</h5>
+    @if (userTickets != null)
+    {
+        foreach (var user in userTickets)
+        {
+            <p class="text-center"><b>@user.UserName</b></p>
+        }
+    }
+</div>
+<div class="card-footer">
+    <div>
+        <button type="button" @onclick="OkButtonAction" class="btn btn-sm btn-outline-light m-2">Ok</button>
+    </div>
+</div>
+
+
+
+
+
+@code {
+    [Parameter]
+    public Ticket ticket { get; set; }
+    [Parameter]
+    public EventCallback<Guid> OnEdited { get; set; }
+    [Parameter]
+    public UserTicket[] userTickets { get; set; }
+
+
+
+    private async void OkButtonAction()
+    {
+        await OnEdited.InvokeAsync(ticket.Id);
+    }
+
+}

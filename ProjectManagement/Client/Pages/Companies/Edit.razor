@@ -1,0 +1,55 @@
+﻿@page "/companies/edit/{Id:guid}"
+
+@inject HttpClient Http
+@inject NavigationManager Navigation
+@attribute [Authorize]
+
+
+<EditForm Model="Company" OnValidSubmit="@HandleValidSubmit">
+    <DataAnnotationsValidator />
+    <div class="form-group float-left m-2">
+        <input @bind-value="Company.Name" @bind-value:event="oninput" />
+        <ValidationMessage For="@(() => Company.Name)" />
+    </div>
+    <button type="submit" class="btn btn-sm btn-outline-success m-2">Submit</button>
+</EditForm>
+
+
+
+@code
+{
+    [Parameter]
+    public Guid Id { get; set; }
+
+    [Parameter]
+    public EventCallback<Guid> OnEdited { get; set; }
+
+    public Company Company { get; set; } = new Company();
+
+    protected async override Task OnInitializedAsync()
+    {
+
+        try
+        {
+            Company = await Http.GetFromJsonAsync<Company>($"/api/Companies/{Id}");
+        }
+        catch (Exception e)
+        {
+        }
+    }
+
+    private async void HandleValidSubmit()
+    {
+        try
+        {
+            var response = await Http.PutAsJsonAsync($"/api/Companies/{Company.Id}", Company);
+            response.EnsureSuccessStatusCode();
+
+            await OnEdited.InvokeAsync(Company.Id);
+        }
+        catch (Exception e)
+        {
+        }
+
+    }
+}

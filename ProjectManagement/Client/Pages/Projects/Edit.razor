@@ -1,0 +1,63 @@
+﻿@page "/projects/edit/{Id:guid}"
+
+@inject HttpClient Http
+@inject NavigationManager Navigation
+@attribute [Authorize]
+
+
+<EditForm Model="Project" OnValidSubmit="@HandleValidSubmit">
+    <DataAnnotationsValidator />
+    <div class="card-header">
+        <h4>@Project.Name</h4> <!--Project Name-->
+    </div>
+    <div class="card-body">
+        <p><b>Due Date: </b> <input type="date" @bind-value="Project.DueDate" min="@Project.StartDate.ToString("yyyy-MM-dd")" max=""></p>
+        <p><b>Start Date: </b> <input type="date" @bind-value="Project.StartDate" max="@Project.DueDate.ToString("yyyy-MM-dd")"></p>
+    </div>
+    <div class="input-group-prepend">
+        <input @bind-value="Project.Name" @bind-value:event="oninput" />
+        <ValidationMessage For="@(() => Project.Name)" />
+        <button type="submit" class="btn btn-sm btn-outline-success">Submit</button>
+    </div>
+</EditForm>
+
+
+
+@code
+{
+    [Parameter]
+    public Guid Id { get; set; }
+
+    [Parameter]
+    public EventCallback<Guid> OnEdited { get; set; }
+
+    public Project Project { get; set; } = new Project();
+
+    protected async override Task OnInitializedAsync()
+    {
+        try
+        {
+            Project = await Http.GetFromJsonAsync<Project>($"/api/projects/{Id}");
+        }
+        catch (Exception e)
+        {
+        }
+    }
+
+
+
+    private async void HandleValidSubmit()
+    {
+        try
+        {
+            var response = await Http.PutAsJsonAsync($"/api/Projects/{Project.Id}", Project);
+            response.EnsureSuccessStatusCode();
+
+            await OnEdited.InvokeAsync(Project.Id);
+        }
+        catch (Exception e)
+        {
+        }
+
+    }
+}

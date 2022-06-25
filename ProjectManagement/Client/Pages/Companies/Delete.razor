@@ -1,0 +1,47 @@
+﻿@page "/companies/delete/{Id:guid}"
+
+@inject HttpClient Http
+@inject NavigationManager Navigation
+@attribute [Authorize]
+
+<div>
+    <h3>Are you sure you want to delete @company.Name?</h3>
+    <div class="btn-group">
+        <button class="btm btn-danger ml-5" @onclick="DeleteCompany">Delete</button>
+        <button class="btm btn-primary" @onclick="CancelDelete">Cancel</button>
+    </div>
+</div>
+
+
+
+@code {
+
+    [Parameter]
+    public Guid Id { get; set; }
+    public Company company { get; set; } = new Company();
+
+    protected async override Task OnInitializedAsync()
+    {
+        try
+        {
+            company = await Http.GetFromJsonAsync<Company>($"/api/Companies/{Id}");
+        }
+        catch (Exception e)
+        {
+        }
+    }
+
+    private async void DeleteCompany()
+    {
+        await Http.DeleteAsync($"/api/Companies/{Id}");
+        Navigation.NavigateTo("/companies");
+    }
+
+    private void CancelDelete()
+    {
+        Navigation.NavigateTo("/companies");
+    }
+
+
+
+}

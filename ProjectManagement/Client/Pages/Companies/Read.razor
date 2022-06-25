@@ -1,0 +1,45 @@
+﻿@page "/companies/read"
+
+@inject HttpClient Http
+@attribute [Authorize]
+
+<div class="container-fluid mt-2 mb-2 rounded" style="background-image: linear-gradient( 45deg, #3a0647, #052767); ">
+    <div class="d-flex justify-content-between text-white">
+        <p></p>
+        @if (showEdit)
+        {
+            <Edit Id="Company.Id" OnEdited="UpdateEdit"></Edit>
+        }
+        else
+        {
+            <p class="text-white m-2" @onclick="ShowEdit"><b>@Company.Name</b></p> <!--Company Name-->
+        }
+        <div>
+            <a href="/companies/delete/@Company.Id" class="oi oi-trash text-danger float-right m-2"></a>                    <!--Delete link-->
+            <a style="cursor: pointer" class="oi oi-pencil float-right m-2 text-primary" @onclick="ShowEdit"></a>           <!--Edit link-->
+        </div>
+    </div>
+    <ProjectManagement.Client.Pages.Projects.Index Company="Company"></ProjectManagement.Client.Pages.Projects.Index>
+</div>
+
+@code {
+    [Parameter]
+    public Company Company { get; set; }
+    private bool showEdit = false;
+
+    public void ShowEdit()
+    {
+        if (showEdit == true)
+            showEdit = false;
+        else
+            showEdit = true;
+    }
+
+
+    public async Task UpdateEdit()
+    {
+        Company = await Http.GetFromJsonAsync<Company>($"/api/Companies/{Company.Id}");
+        ShowEdit();
+    }
+
+}
